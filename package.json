@@ -4,7 +4,8 @@
     "description": "Simple script to fetch CS2 Inventory with item floats using NodeJS and csinventoryapi.com",
     "main": "index.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node index.js"
     },
     "repository": {
         "type": "git",
