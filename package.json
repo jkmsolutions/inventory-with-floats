@@ -1,0 +1,30 @@
+{
+    "name": "inventory-with-floats",
+    "version": "1.0.0",
+    "description": "Simple script to fetch CS2 Inventory with item floats using NodeJS and csinventoryapi.com",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/jkmsolutions/inventory-with-floats.git"
+    },
+    "keywords": [
+        "inventory",
+        "cs2",
+        "steam",
+        "floats",
+        "csinventoryapi"
+    ],
+    "author": "JKM Solutions AB",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/jkmsolutions/inventory-with-floats/issues"
+    },
+    "homepage": "https://github.com/jkmsolutions/inventory-with-floats#readme",
+    "dependencies": {
+        "axios": "^1.7.7"
+    },
+    "type": "module"
+}
