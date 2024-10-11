@@ -1,4 +1,4 @@
-# Fetch CS2 Inventory with Floats using CSInventoryAPI.com
+### Fetch CS2 Inventory with Floats using [CSInventoryAPI.com](https://csinventoryapi.com)
 
 This is a simple script to fetch the CS2 Inventory of a given steamid64, and fetch item floats for the items in said inventory.  
 
