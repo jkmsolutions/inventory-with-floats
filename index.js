@@ -1,5 +1,5 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
+import dotenv, { parse } from 'dotenv';
 dotenv.config();
 
 const API_KEY = process.env.CSINVENTORYAPI_KEY;
@@ -36,6 +36,11 @@ if (!API_KEY) {
  * @property {String} market_hash_name
  * @property {String} name_color
  * You can fetch many more properties from descriptions[]
+ * 
+ * Float properties
+ * @property {Number} floatvalue
+ * @property {Number} paintseed
+ * @property {Number} paintindex
  */
 
 /**
@@ -98,14 +103,57 @@ const parseInventory = async (inventory) => {
     return parsedInventory;
 }
 
-const addFloatsToParsedInventory = async (parsedInventory) => {
+/**
+ * Populates the float values of the items in the inventory
+ * @param {ParsedInventoryItem[]} parsedInventory 
+ * @param {steamid64} steamid64 
+ * @returns {Promise<ParsedInventoryItem[]>}
+ */
+const addFloatsToParsedInventory = async (parsedInventory, steamid64) => {
+    const parsedInventoryWithFloats = [];
 
+    for (const item of parsedInventory) {
+        try {
+            if (!item.inspect_url) {
+                console.error('No inspect url found for item:', item.market_hash_name);
+                continue;
+            }
+
+            // replace %owner_steamid% with the steamid64 of the user
+            // and %assetid% with the assetid of the item
+            const parsedInspectUrl = item.inspect_url.replace('%owner_steamid%', steamid64).replace('%assetid%', item.assetid);
+
+            const response = await axios.get(
+                'https://csinventoryapi.com/api/v1/inspect?api_key=' + API_KEY + '&url=' + parsedInspectUrl
+            );
+            
+            const { floatvalue, paintseed, paintindex } = response.data.iteminfo;
+
+            parsedInventoryWithFloats.push({
+                ...item,
+                inspect_url: parsedInspectUrl,
+                floatvalue,
+                paintseed,
+                paintindex
+            });
+
+            await new Promise(r => setTimeout(r, 10000));
+            console.log('Fetched float values for item:', item.market_hash_name);
+        } catch (error) {
+            console.log(error);
+            console.error('Failed to fetch float values for item:', item.market_hash_name);
+        }
+    }
+
+    return parsedInventoryWithFloats;
 }
 
 const getInventoryWithFloats = async (steamid64) => {
     const inventory = await getUserInventory(steamid64);
     const parsedInventory = await parseInventory(inventory);
-    console.log(parsedInventory);
+    const inventoryWithFloats = await addFloatsToParsedInventory(parsedInventory, steamid64);
+    console.log(inventoryWithFloats);
 }
 
+// Change the steamid64 to the user you want to fetch the inventory of
 getInventoryWithFloats('76561198166295458');
