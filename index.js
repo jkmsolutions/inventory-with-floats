@@ -1,5 +1,5 @@
 import axios from 'axios';
-import dotenv, { parse } from 'dotenv';
+import dotenv from 'dotenv';
 dotenv.config();
 
 const API_KEY = process.env.CSINVENTORYAPI_KEY;
@@ -10,9 +10,10 @@ if (!API_KEY) {
 
 /**
  * @typedef {Object} Inventory
- * 
+ *
  * @property {Array} assets
  * @property {Array} descriptions
+ * @property {Array} [asset_properties]
  * @property {Number} total_inventory_count
  * @property {Number} success
  * @property {Number} rwgrsn
@@ -20,14 +21,14 @@ if (!API_KEY) {
 
 /**
  * @typedef {Object} ParsedInventoryItem
- * 
+ *
  * These are from assets[]
  * @property {Number} appid
  * @property {String} classid
  * @property {String} instanceid
  * @property {String} assetid
  * @property {String} contextid
- * 
+ *
  * These are from descriptions[]
  * @property {String} icon_url
  * @property {Number} tradable
@@ -36,16 +37,19 @@ if (!API_KEY) {
  * @property {String} market_hash_name
  * @property {String} name_color
  * You can fetch many more properties from descriptions[]
- * 
+ *
+ * These are from asset_properties[]
+ * @property {Array} asset_properties
+ *
  * Float properties
- * @property {Number} floatvalue
+ * @property {Number} float_value
  * @property {Number} paintseed
  * @property {Number} paintindex
  */
 
 /**
  * Fetches the inventory of a user
- * 
+ *
  * @param {string} steamid64 of the user
  * @returns {Promise<Inventory>} the user's inventory
  */
@@ -70,8 +74,8 @@ const getUserInventory = async (steamid64) => {
 }
 
 /**
- * 
- * @param {Inventory} inventory 
+ *
+ * @param {Inventory} inventory
  * @returns {Promise<ParsedInventoryItem[]>}
  */
 const parseInventory = async (inventory) => {
@@ -80,6 +84,9 @@ const parseInventory = async (inventory) => {
     for (let i = 0; i < inventory.assets.length; i++) {
         const asset = inventory.assets[i];
         const description = inventory.descriptions.find(d => d.classid === asset.classid);
+        const assetPropertiesEntry = (inventory.asset_properties || []).find(
+            (entry) => entry.assetid === asset.assetid
+        );
 
         if (!description) {
             continue;
@@ -94,6 +101,7 @@ const parseInventory = async (inventory) => {
             icon_url: description.icon_url,
             tradable: description.tradable,
             inspect_url: description.actions && description.actions[0] && description.actions[0].link || null,
+            asset_properties: assetPropertiesEntry && assetPropertiesEntry.asset_properties || [],
             name: description.name,
             market_hash_name: description.market_hash_name,
             name_color: description.name_color
@@ -105,11 +113,10 @@ const parseInventory = async (inventory) => {
 
 /**
  * Populates the float values of the items in the inventory
- * @param {ParsedInventoryItem[]} parsedInventory 
- * @param {steamid64} steamid64 
+ * @param {ParsedInventoryItem[]} parsedInventory
  * @returns {Promise<ParsedInventoryItem[]>}
  */
-const addFloatsToParsedInventory = async (parsedInventory, steamid64) => {
+const addFloatsToParsedInventory = async (parsedInventory) => {
     const parsedInventoryWithFloats = [];
 
     for (const item of parsedInventory) {
@@ -119,25 +126,44 @@ const addFloatsToParsedInventory = async (parsedInventory, steamid64) => {
                 continue;
             }
 
-            // replace %owner_steamid% with the steamid64 of the user
-            // and %assetid% with the assetid of the item
-            const parsedInspectUrl = item.inspect_url.replace('%owner_steamid%', steamid64).replace('%assetid%', item.assetid);
+            const itemCertProp = (item.asset_properties || []).find(
+                (prop) => prop.propertyid === 6
+            );
+
+            if (!itemCertProp || !itemCertProp.string_value) {
+                console.error('No inspect payload found for item:', item.market_hash_name);
+                continue;
+            }
+
+            const parsedInspectUrl = item.inspect_url.replace(
+                '%propid:6%',
+                itemCertProp.string_value
+            );
+
+            if (parsedInspectUrl.includes('%propid:6%')) {
+                console.error('Failed to populate inspect url for item:', item.market_hash_name);
+                continue;
+            }
+
+            const params = new URLSearchParams();
+            params.append('url', parsedInspectUrl);
+            params.append('api_key', API_KEY);
 
             const response = await axios.get(
-                'https://csinventoryapi.com/api/v1/inspect?api_key=' + API_KEY + '&url=' + parsedInspectUrl
+                'https://csinventoryapi.com/api/v2/items/inspect?' + params.toString()
             );
-            
-            const { floatvalue, paintseed, paintindex } = response.data.iteminfo;
+
+            const { float_value, paintseed, paintindex } = response.data;
 
             parsedInventoryWithFloats.push({
                 ...item,
                 inspect_url: parsedInspectUrl,
-                floatvalue,
+                float_value,
                 paintseed,
                 paintindex
             });
 
-            await new Promise(r => setTimeout(r, 10000));
+            await new Promise(r => setTimeout(r, 1000));
             console.log('Fetched float values for item:', item.market_hash_name);
         } catch (error) {
             console.log(error);
@@ -151,9 +177,8 @@ const addFloatsToParsedInventory = async (parsedInventory, steamid64) => {
 const getInventoryWithFloats = async (steamid64) => {
     const inventory = await getUserInventory(steamid64);
     const parsedInventory = await parseInventory(inventory);
-    const inventoryWithFloats = await addFloatsToParsedInventory(parsedInventory, steamid64);
+    const inventoryWithFloats = await addFloatsToParsedInventory(parsedInventory);
     console.log(inventoryWithFloats);
 }
 
-// Change the steamid64 to the user you want to fetch the inventory of
 getInventoryWithFloats('76561198166295458');
